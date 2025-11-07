@@ -13,7 +13,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from ksef_client import KSeFAPIError, KSeFAuthError, KSeFClient
 
-# Sample invoice XML (simplified example - real invoices need proper FA_VAT format)
+# IMPORTANT: This is a simplified example invoice XML for demonstration purposes only.
+# Real invoices MUST follow the official FA_VAT schema published by the Polish Ministry of Finance.
+# Before production use:
+# 1. Validate your invoice XML against the official FA_VAT XSD schema
+# 2. Ensure all required fields are properly filled
+# 3. Add proper digital signatures if required
+# 4. Calculate and include the SHA-256 hash
+# See: https://www.gov.pl/web/kas/krajowy-system-e-faktur for official documentation
 SAMPLE_INVOICE_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <Faktura xmlns="http://crd.gov.pl/wzor/2023/06/29/12648/">
     <Naglowek>

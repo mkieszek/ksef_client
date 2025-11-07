@@ -20,23 +20,23 @@ def test_session_token_model():
         token="test-token",
         contextIdentifier="test-context",
         sessionId="test-session",
-        timestamp=datetime(2025, 1, 1, 12, 0, 0),
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
     )
     assert token.token == "test-token"
     assert token.context_identifier == "test-context"
     assert token.session_id == "test-session"
-    assert token.timestamp == datetime(2025, 1, 1, 12, 0, 0)
+    assert token.timestamp == datetime(2024, 1, 1, 12, 0, 0)
 
 
 def test_invoice_submission_response():
     """Test InvoiceSubmissionResponse model."""
     response = InvoiceSubmissionResponse(
         referenceNumber="REF-123",
-        timestamp=datetime(2025, 1, 1, 12, 0, 0),
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
         processingCode=200,
     )
     assert response.reference_number == "REF-123"
-    assert response.timestamp == datetime(2025, 1, 1, 12, 0, 0)
+    assert response.timestamp == datetime(2024, 1, 1, 12, 0, 0)
     assert response.processing_code == 200
 
 
@@ -96,12 +96,12 @@ def test_error_response():
     error = ErrorResponse(
         errorCode="ERR-001",
         errorMessage="Test error",
-        timestamp=datetime(2025, 1, 1, 12, 0, 0),
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
         details={"field": "value"},
     )
     assert error.error_code == "ERR-001"
     assert error.error_message == "Test error"
-    assert error.timestamp == datetime(2025, 1, 1, 12, 0, 0)
+    assert error.timestamp == datetime(2024, 1, 1, 12, 0, 0)
     assert error.details == {"field": "value"}
 
 
@@ -110,7 +110,7 @@ def test_error_response_without_details():
     error = ErrorResponse(
         errorCode="ERR-001",
         errorMessage="Test error",
-        timestamp=datetime(2025, 1, 1, 12, 0, 0),
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
     )
     assert error.error_code == "ERR-001"
     assert error.details is None

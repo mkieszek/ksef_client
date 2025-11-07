@@ -2,8 +2,10 @@
 Data models for KSeF API requests and responses.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -54,9 +56,9 @@ class InvoiceQueryRequest(BaseModel):
 
     page_size: int = Field(default=10, alias="pageSize")
     page_offset: int = Field(default=0, alias="pageOffset")
-    invoice_type: Optional[str] = Field(default=None, alias="invoiceType")
-    date_from: Optional[str] = Field(default=None, alias="dateFrom")
-    date_to: Optional[str] = Field(default=None, alias="dateTo")
+    invoice_type: str | None = Field(default=None, alias="invoiceType")
+    date_from: str | None = Field(default=None, alias="dateFrom")
+    date_to: str | None = Field(default=None, alias="dateTo")
 
 
 class InvoiceListItem(BaseModel):
@@ -85,4 +87,4 @@ class ErrorResponse(BaseModel):
     error_code: str = Field(alias="errorCode")
     error_message: str = Field(alias="errorMessage")
     timestamp: datetime
-    details: Optional[dict[str, Any]] = None
+    details: dict[str, Any] | None = None

@@ -2,7 +2,7 @@
 Custom exceptions for KSeF Client.
 """
 
-from typing import Optional
+from __future__ import annotations
 
 
 class KSeFError(Exception):
@@ -23,8 +23,8 @@ class KSeFAPIError(KSeFError):
     def __init__(
         self,
         message: str,
-        status_code: Optional[int] = None,
-        response_data: Optional[dict] = None,
+        status_code: int | None = None,
+        response_data: dict | None = None,
     ):
         super().__init__(message)
         self.status_code = status_code

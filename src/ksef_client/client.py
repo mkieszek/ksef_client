@@ -2,8 +2,10 @@
 Main KSeF API Client implementation.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -45,7 +47,7 @@ class KSeFClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.verify_ssl = verify_ssl
-        self._session_token: Optional[str] = None
+        self._session_token: str | None = None
         self._client = httpx.Client(timeout=timeout, verify=verify_ssl)
 
     def __enter__(self):
@@ -192,12 +194,17 @@ class KSeFClient:
 
         url = f"{self.base_url}/online/Invoice/Send"
 
+        # NOTE: In production, you should calculate the SHA-256 hash of the invoice XML
+        # and provide it in base64 encoding. For demo purposes, this is left empty.
+        # Example:
+        #   import hashlib, base64
+        #   hash_value = base64.b64encode(hashlib.sha256(invoice_xml.encode()).digest()).decode()
         payload = {
             "invoiceHash": {
                 "hashSHA": {
                     "algorithm": "SHA-256",
                     "encoding": "Base64",
-                    "value": "",  # Should be calculated from invoice_xml
+                    "value": "",  # TODO: Calculate SHA-256 hash of invoice_xml in base64
                 },
                 "fileSize": len(invoice_xml),
             },
@@ -221,8 +228,8 @@ class KSeFClient:
         self,
         page_size: int = 10,
         page_offset: int = 0,
-        date_from: Optional[str] = None,
-        date_to: Optional[str] = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
     ) -> InvoiceListResponse:
         """
         Query incoming invoices.
