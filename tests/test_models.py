@@ -44,13 +44,13 @@ def test_invoice_header():
     """Test InvoiceHeader model."""
     header = InvoiceHeader(
         invoiceNumber="INV-001",
-        issueDate="2025-01-01",
+        issueDate="2024-01-01",
         sellerNip="1234567890",
         buyerNip="0987654321",
         amountGross=1230.50,
     )
     assert header.invoice_number == "INV-001"
-    assert header.issue_date == "2025-01-01"
+    assert header.issue_date == "2024-01-01"
     assert header.seller_nip == "1234567890"
     assert header.buyer_nip == "0987654321"
     assert header.amount_gross == 1230.50
@@ -61,7 +61,7 @@ def test_invoice_list_item():
     item = InvoiceListItem(
         referenceNumber="REF-123",
         invoiceNumber="INV-001",
-        issueDate="2025-01-01",
+        issueDate="2024-01-01",
         sellerName="Test Seller",
         buyerName="Test Buyer",
         amountGross=1230.50,
@@ -78,7 +78,7 @@ def test_invoice_list_response():
         InvoiceListItem(
             referenceNumber="REF-123",
             invoiceNumber="INV-001",
-            issueDate="2025-01-01",
+            issueDate="2024-01-01",
             sellerName="Test Seller",
             buyerName="Test Buyer",
             amountGross=1230.50,

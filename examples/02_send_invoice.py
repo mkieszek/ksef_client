@@ -26,7 +26,7 @@ SAMPLE_INVOICE_XML = """<?xml version="1.0" encoding="UTF-8"?>
     <Naglowek>
         <KodFormularza kodSystemowy="FA (2)" wersjaSchemy="1-0E">FA</KodFormularza>
         <WariantFormularza>2</WariantFormularza>
-        <DataWytworzeniaFa>2025-01-15T10:00:00</DataWytworzeniaFa>
+        <DataWytworzeniaFa>2024-01-15T10:00:00</DataWytworzeniaFa>
         <SystemInfo>KSeF Client Example</SystemInfo>
     </Naglowek>
     <Podmiot1>
@@ -52,8 +52,8 @@ SAMPLE_INVOICE_XML = """<?xml version="1.0" encoding="UTF-8"?>
         </Adres>
     </Podmiot2>
     <Fa>
-        <P_1>2025-01-15</P_1>
-        <P_2>INV-001-2025</P_2>
+        <P_1>2024-01-15</P_1>
+        <P_2>INV-001-2024</P_2>
         <P_13_1>1000.00</P_13_1>
         <P_14_1>230.00</P_14_1>
         <P_15>1230.00</P_15>
