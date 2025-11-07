@@ -3,7 +3,7 @@ Main KSeF API Client implementation.
 """
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -45,7 +45,7 @@ class KSeFClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.verify_ssl = verify_ssl
-        self._session_token: str | None = None
+        self._session_token: Optional[str] = None
         self._client = httpx.Client(timeout=timeout, verify=verify_ssl)
 
     def __enter__(self):
@@ -100,7 +100,8 @@ class KSeFClient:
                 error_msg, status_code=response.status_code, response_data=error_data
             ) from e
 
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     def authenticate_interactive(self, nip: str, token: str) -> SessionToken:
         """
@@ -220,8 +221,8 @@ class KSeFClient:
         self,
         page_size: int = 10,
         page_offset: int = 0,
-        date_from: str | None = None,
-        date_to: str | None = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
     ) -> InvoiceListResponse:
         """
         Query incoming invoices.
