@@ -59,9 +59,6 @@ class KsefAuthClient:
         """
         if not challenge:
             raise ValueError("Challenge cannot be empty")
-        try:
-            # TODO(issue-link): implement digital signature + token exchange per KSeF spec.
-            _logger.debug("Generating auth token (stub) for challenge length=%s", len(challenge))
-            return f"stub-token-for-{challenge[:8]}"
-        except Exception as exc:  # pragma: no cover - defensive
-            raise KsefAuthError("Failed to generate auth token") from exc
+        # TODO(issue-link): implement digital signature + token exchange per KSeF spec.
+        _logger.debug("Generating auth token (stub) for challenge length=%s", len(challenge))
+        return f"stub-token-for-{challenge[:8]}"
