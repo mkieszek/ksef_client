@@ -1,0 +1,30 @@
+[project]
+name = "ksef_client"
+version = "0.1.0"
+description = "Odoo 18 module integrating with Polish KSeF (structured e-invoices)."
+requires-python = ">=3.10"
+license = {text = "LGPL-3"}
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+exclude = ["**/migrations/**", "venv", ".venv", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "W"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ksef_client", "ksef_api_client"]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.ksef]
+# Placeholder for future configuration (endpoints, timeouts, etc.)

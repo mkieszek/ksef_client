@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Environments
+.venv/
+venv/
+.env
+.env.*
+
+# Build
+build/
+dist/
+*.log
+
+# Odoo
+*.zip
+*.xlsx
+*.xls
+*.csv
+*.pot
+*.po~
+
+# Secrets (never commit real keys/certs)
+*.key
+*.pem
+*.p12
+*.crt
+*.cer
+secrets/
+
+# IDE
+.vscode/
+.idea/
