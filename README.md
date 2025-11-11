@@ -12,7 +12,7 @@ Wczesny scaffold: struktura modułu + klient uwierzytelniania (stub) + testy smo
 __manifest__.py        # Metadane modułu Odoo
 models/                # Rozszerzenia modeli Odoo (puste)
 ksef_api_client/       # Warstwa integracji z KSeF
-	auth.py              # Uwierzytelnianie (stub token)
+    auth.py              # Uwierzytelnianie (stub token)
 tests/                 # Testy smoke (Python)
 .github/               # Szablony Issue/PR + instrukcje Copilot
 pyproject.toml         # Konfiguracja Ruff
