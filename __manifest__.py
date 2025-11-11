@@ -3,7 +3,7 @@
 
 MANIFEST = {
     "name": "KSeF Client for Odoo 18",
-    "version": "16.0.1.0.0",
+    "version": "18.0.1.0.0",
     "summary": "Integracja z Krajowym Systemem e-Faktur (KSeF)",
     "author": "mkieszek",
     "license": "LGPL-3",
