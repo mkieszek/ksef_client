@@ -18,7 +18,7 @@ from xml.etree import ElementTree as ET
 import requests
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 _logger = logging.getLogger(__name__)
 
@@ -197,6 +197,13 @@ class KsefAuthClient:
             private_key = serialization.load_pem_private_key(
                 self._materials.key_data, password=passphrase_bytes
             )
+
+            # Ensure we have an RSA private key (required for KSeF)
+            if not isinstance(private_key, rsa.RSAPrivateKey):
+                raise KsefAuthError(
+                    f"Invalid key type: {type(private_key).__name__}. "
+                    "KSeF authentication requires an RSA private key."
+                )
 
             # Create XML namespaces
             ns_auth = "http://ksef.mf.gov.pl/auth/token/2.0"
