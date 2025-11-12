@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  odoo:
+    build:
+      context: ..
+      dockerfile: docker/odoo/Dockerfile
+      target: test
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ODOO_ENV: test
+    volumes:
+      - ../config/odoo.test.conf:/etc/odoo/odoo.conf:ro
+    command: bash -lc "odoo -c /etc/odoo/odoo.conf -i ksef_client --stop-after-init -d test_db && pytest -q /mnt/extra-addons/ksef_client/tests && ruff check /mnt/extra-addons/ksef_client"
