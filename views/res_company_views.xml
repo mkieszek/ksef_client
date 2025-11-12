@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Extend company form view with KSeF configuration -->
+    <record id="view_company_form_ksef" model="ir.ui.view">
+        <field name="name">res.company.form.ksef</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form"/>
+        <field name="arch" type="xml">
+            <!-- Add KSeF configuration page to company settings -->
+            <xpath expr="//notebook" position="inside">
+                <page string="KSeF Configuration" name="ksef_config">
+                    <group>
+                        <group string="Environment">
+                            <field name="ksef_environment" widget="radio"/>
+                        </group>
+                        <group string="Authentication Credentials">
+                            <field name="ksef_auth_cert" filename="ksef_auth_cert_filename"/>
+                            <field name="ksef_auth_cert_filename" invisible="1"/>
+                            <field name="ksef_auth_key" filename="ksef_auth_key_filename" password="True"/>
+                            <field name="ksef_auth_key_filename" invisible="1"/>
+                            <field name="ksef_auth_key_password" password="True"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Session Information">
+                            <field name="ksef_auth_token" password="True"/>
+                            <field name="ksef_token_valid_to"/>
+                        </group>
+                    </group>
+                    <group>
+                        <button
+                            name="action_ksef_test_connection"
+                            string="Test Connection and Authenticate"
+                            type="object"
+                            class="oe_highlight"
+                            help="Test connection to KSeF and obtain a session token"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

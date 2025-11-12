@@ -1,3 +1,7 @@
 # Initialize KSeF client module
 
-from . import models  # noqa: F401
+import contextlib
+
+with contextlib.suppress(ImportError):
+    # Allow module to be imported without Odoo for testing
+    from . import models  # noqa: F401

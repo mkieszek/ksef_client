@@ -160,11 +160,42 @@ Notes:
 
 ### Debugging in dev (VS Code attach)
 
-The dev container starts Python with `debugpy` listening on port `5678` (see dev overlay). To attach from VS Code:
+The dev container runs Odoo under `debugpy` and listens on port `5678` (see `compose/docker-compose.dev.yml`). A ready-to-use VS Code launch configuration is included at `.vscode/launch.json`.
 
-1. Install the “Python” extension in VS Code.
-2. Add a launch configuration of type “Python: Attach using Process Id” or “Python: Remote Attach” targeting `localhost:5678`.
-3. Set breakpoints in your module code under `ksef_client/` and attach; requests handled by Odoo will pause accordingly.
+Steps to attach from VS Code:
+
+1. Install the official Python extension in VS Code (and keep it up to date).
+2. Open the workspace file `ksef_client.code-workspace` so both `ksef_client` and `odoo` are available to the editor.
+3. Select the Python interpreter for the workspace (use your project venv):
+    - Ctrl+Shift+P → `Python: Select Interpreter` → pick `${workspaceFolder:ksef_client}/.venv/bin/python` (or your venv path).
+4. Open the Run and Debug panel and choose `Python: Remote Attach to Odoo (dev)` (provided in `.vscode/launch.json`).
+5. Press the green ▶️ to connect. The configuration attaches to `localhost:5678` and uses path mappings so breakpoints work in both the `ksef_client` module and Odoo core (`odoo` folder).
+
+If you prefer to create a custom configuration, here's the recommended structure (already present in the repo):
+
+```json
+{
+   "version": "0.2.0",
+   "configurations": [
+      {
+         "name": "Python: Remote Attach to Odoo (dev)",
+         "type": "debugpy",
+         "request": "attach",
+         "connect": { "host": "localhost", "port": 5678 },
+         "pathMappings": [
+            { "localRoot": "${workspaceFolder:ksef_client}", "remoteRoot": "/mnt/extra-addons/ksef_client" },
+            { "localRoot": "${workspaceFolder:odoo}", "remoteRoot": "/opt/odoo-src" }
+         ],
+         "justMyCode": false
+      }
+   ]
+}
+```
+
+Notes:
+- If you run VS Code on a remote machine or use Docker Desktop without `host.docker.internal`, change the `connect.host` to the host IP reachable from your IDE.
+- If you mount Odoo into a different container path than `/opt/odoo-src`, update `remoteRoot` accordingly.
+- `justMyCode: false` allows stepping into Odoo core; set it to `true` to focus only on your module.
 
 ### Troubleshooting
 

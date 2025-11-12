@@ -8,7 +8,9 @@
     "website": "https://github.com/mkieszek/ksef_client",
     "category": "Accounting",
     "depends": ["base", "account"],
-    "data": [],
+    "data": [
+        "views/res_company_views.xml",
+    ],
     "demo": [],
     "installable": True,
     "application": False,
