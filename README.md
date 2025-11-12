@@ -9,21 +9,21 @@ Early scaffold: module structure + authentication client (stub) + smoke tests + 
 ## Project structure
 
 ```
-__manifest__.py        # Metadane modułu Odoo
-models/                # Rozszerzenia modeli Odoo (puste)
-ksef_api_client/       # Warstwa integracji z KSeF
-    auth.py              # Uwierzytelnianie (stub token)
-tests/                 # Testy smoke (Python)
-.github/               # Szablony Issue/PR + instrukcje Copilot
-pyproject.toml         # Konfiguracja Ruff
-CONTRIBUTING.md        # Zasady współpracy
-docker-compose.yml     # Środowisko deweloperskie (PostgreSQL + Odoo)
-docker/odoo/Dockerfile # Obraz Odoo 18 z venv + pip
-requirements.txt       # Dodatkowe zależności Pythona (instalowane do venv)
-config/odoo.conf       # Konfiguracja Odoo (addons_path, DB, logi)
+__manifest__.py        # Odoo module manifest
+models/                # Odoo model extensions (currently empty)
+ksef_api_client/       # KSeF integration layers
+   auth.py              # Authentication (stub token)
+tests/                 # Smoke tests (Python)
+.github/               # Issue/PR templates + Copilot instructions
+pyproject.toml         # Ruff configuration
+CONTRIBUTING.md        # Contribution guidelines
+docker/odoo/Dockerfile # Multi-stage Dockerfile (base/dev/test/prod)
+compose/               # Compose overlays per environment
+requirements.txt       # Python dependencies (installed into venv)
+config/*.conf          # Odoo config files (dev/test/prod)
 ```
 
-## Development setup (Docker)
+## Multi-environment setup (Docker)
 
 ### Prerequisites
 
@@ -31,7 +31,9 @@ Make sure you have Docker and Docker Compose installed on your system:
 - [Install Docker](https://docs.docker.com/get-docker/)
 - [Install Docker Compose](https://docs.docker.com/compose/install/)
 
-### Quick start
+You can use the provided Makefile to simplify commands. All examples below include both Makefile and raw docker compose forms.
+
+### Dev environment (hot-reload)
 
 1. **Clone the repository:**
    ```bash
@@ -40,14 +42,24 @@ Make sure you have Docker and Docker Compose installed on your system:
    ```
 
 2. **Build (first run or after requirements change):**
-   ```bash
-   docker compose build --no-cache odoo
-   ```
+    - Using Makefile (recommended):
+       ```bash
+       make dev-build
+       ```
+    - Or with docker compose overlays:
+       ```bash
+       docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.dev.yml build odoo
+       ```
 
-3. **Start the development environment:**
-   ```bash
-   docker compose up -d
-   ```
+3. **Start the development environment (overlay compose):**
+    - Using Makefile:
+       ```bash
+       make dev-up
+       ```
+    - Or with docker compose overlays:
+       ```bash
+       docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.dev.yml up -d --build
+       ```
 
    This will:
    - Start PostgreSQL 16 database on port 5432
@@ -60,11 +72,68 @@ Make sure you have Docker and Docker Compose installed on your system:
    - Install the `ksef_client` module from the Apps menu
 
 5. **Stop the environment:**
-   ```bash
-   docker compose down
-   ```
+    - Using Makefile:
+       ```bash
+       make dev-down
+       ```
+    - Or with docker compose:
+       ```bash
+       docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.dev.yml down
+       ```
 
-### Running Tests and Linting
+6. **Useful dev helpers:**
+    - Logs
+       ```bash
+       make dev-logs
+       # or
+       docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.dev.yml logs -f odoo
+       ```
+    - Odoo shell
+       ```bash
+       make dev-shell
+       # or
+       docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.dev.yml exec odoo odoo shell --config /etc/odoo/odoo.conf
+       ```
+    - Update/reload module in DB (after Python/XML changes)
+       ```bash
+       make update-module
+       ```
+
+### Test (CI-like) environment
+
+Run ephemeral test container (installs module + runs tests + lint):
+```bash
+docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.test.yml up --abort-on-container-exit --build
+```
+
+Or simply run the tests and lint locally via Makefile:
+```bash
+make test
+make lint
+```
+
+### Production build preview
+
+Build production image only (no dev/test extras):
+```bash
+docker build --target=prod -t ksef_client:prod -f docker/odoo/Dockerfile .
+```
+
+Run production overlay locally (minimal runtime, mounts for filestore and config):
+```bash
+make prod-up
+# or
+docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.prod.yml up -d --build
+```
+
+Stop production overlay:
+```bash
+make prod-down
+# or
+docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.prod.yml down
+```
+
+### Running Tests and Linting (Dev container)
 
 Execute commands inside the Odoo container:
 
@@ -89,18 +158,26 @@ Notes:
    ```
    but remember this won’t persist across rebuilds; add it to `requirements.txt` for permanence.
 
+### Debugging in dev (VS Code attach)
+
+The dev container starts Python with `debugpy` listening on port `5678` (see dev overlay). To attach from VS Code:
+
+1. Install the “Python” extension in VS Code.
+2. Add a launch configuration of type “Python: Attach using Process Id” or “Python: Remote Attach” targeting `localhost:5678`.
+3. Set breakpoints in your module code under `ksef_client/` and attach; requests handled by Odoo will pause accordingly.
+
 ### Troubleshooting
 
 **Port conflicts:**
-If ports 8069 or 5432 are already in use on your system, you can change them in `docker-compose.yml`:
+If ports 8069 or 5432 are already in use on your system, change them in the dev overlay `compose/docker-compose.dev.yml`:
 
 ```yaml
 ports:
   - "8070:8069"  # Change host port from 8069 to 8070
 ```
 
-**Rebuild after dependency changes:**
-If you modify `requirements.txt` or `docker/odoo/Dockerfile`, rebuild the Odoo image:
+**Rebuild after dependency changes (dev):**
+If you modify `requirements.txt` or `docker/odoo/Dockerfile`, rebuild the dev image:
 
 ```bash
 docker compose build --no-cache odoo
@@ -121,7 +198,7 @@ docker compose logs -f odoo
 docker compose down -v
 ```
 
-## Alternative setup (local)
+## Alternative local (without Docker)
 
 ### How to run lint
 
@@ -140,9 +217,24 @@ python -m pytest -q
 
 Use the provided templates: Feature, Bug, Chore. Each task should include context, scope, inputs, outputs, DoD, edge cases, and references.
 
+See `.github/copilot-instructions.md` for the Issue Contract, security rules, and Definition of Done used by Copilot-driven work.
+
+## CI
+
+GitHub Actions workflow `.github/workflows/ci.yml` runs on push/PR:
+- Lint + tests using the test compose overlay
+- Build the production image
+
+You can replicate locally with:
+```bash
+make ci
+```
+
 ## Security
 
 Never commit certificates/keys. Key files are ignored by `.gitignore`. Use mocks and placeholder paths in tests.
+
+In production overlay, provide secrets via Docker/host-level mounts or environment variables. Do not store sensitive data in the repository.
 
 ## Next steps
 
@@ -152,9 +244,10 @@ Never commit certificates/keys. Key files are ignored by `.gitignore`. Use mocks
 
 ## FAQ (Docker)
 
-- Czy mogę zmienić port 8069? Tak – edytuj `docker-compose.yml` (np. `"8070:8069"`).
-- Czy mogę dodać nowe paczki Pythona? Dodaj do `requirements.txt` i przebuduj obraz (`docker compose build --no-cache odoo`).
-- Gdzie są logi? Użyj `docker compose logs -f odoo` lub ustaw własny `logfile` w `config/odoo.conf`.
+- Change port 8069? Edit dev compose overlay (`compose/docker-compose.dev.yml`) ports section.
+- Add new Python packages? Append to `requirements.txt` and rebuild: `docker compose build --no-cache odoo`.
+- Where are logs? `docker compose logs -f odoo` or set `logfile` in the relevant config.
+- How to run only production? Use prod overlay: `docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.prod.yml up -d --build`.
 
 ## License
 
