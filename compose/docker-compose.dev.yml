@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  odoo:
+    build:
+      context: ..
+      dockerfile: docker/odoo/Dockerfile
+      target: dev
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8069:8069"
+      - "5678:5678"  # debugpy
+    volumes:
+      - ../:/mnt/extra-addons/ksef_client:ro
+      - ../config/odoo.dev.conf:/etc/odoo/odoo.conf:ro
+      - odoo-filestore:/var/lib/odoo
+    environment:
+      ODOO_ENV: dev
+    command: python -m debugpy --listen 0.0.0.0:5678 -m odoo --config /etc/odoo/odoo.conf --dev=reload,qweb,werkzeug,xml

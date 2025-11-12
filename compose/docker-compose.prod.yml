@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  odoo:
+    build:
+      context: ..
+      dockerfile: docker/odoo/Dockerfile
+      target: prod
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8069:8069"
+    environment:
+      ODOO_ENV: prod
+      DB_HOST: db
+      DB_USER: odoo
+      DB_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - odoo-filestore:/var/lib/odoo
+      - ../config/odoo.prod.conf:/etc/odoo/odoo.conf:ro
+    command: odoo --config /etc/odoo/odoo.conf
+
+secrets:
+  db_password:
+    file: ../secrets/db_password.txt
