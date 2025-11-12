@@ -57,7 +57,7 @@ update-module:
 	$(DOCKER_COMPOSE) -f $(CBASE) -f $(CDEV) exec odoo odoo -c /etc/odoo/odoo.conf -u ksef_client -d $(DB) --stop-after-init
 
 lint:
-	$(DOCKER_COMPOSE) -f $(CBASE) -f $(CDEV) exec odoo ruff check /mnt/extra-addons/ksef_client
+	$(DOCKER_COMPOSE) -f $(CBASE) -f $(CDEV) exec odoo ruff check --no-cache /mnt/extra-addons/ksef_client
 
 format:
 	$(DOCKER_COMPOSE) -f $(CBASE) -f $(CDEV) exec odoo ruff format /mnt/extra-addons/ksef_client

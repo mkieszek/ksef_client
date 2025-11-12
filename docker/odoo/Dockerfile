@@ -52,6 +52,8 @@ COPY requirements.txt /tmp/requirements.txt
 RUN "$VIRTUAL_ENV/bin/pip" install --no-cache-dir -r /tmp/requirements.txt \
     && "$VIRTUAL_ENV/bin/pip" install --no-cache-dir ruff pytest
 COPY . /mnt/extra-addons/ksef_client
+# Ensure the odoo user can write caches (pytest/.ruff_cache) during tests
+RUN chown -R odoo:odoo /mnt/extra-addons/ksef_client
 USER odoo
 ENV ODOO_ENV=test
 
