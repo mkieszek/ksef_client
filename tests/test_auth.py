@@ -116,10 +116,13 @@ class TestKsefAuthClient:
 
     @patch("ksef_api_client.auth.requests.post")
     def test_get_challenge_success(self, mock_post):
-        """Test successful challenge retrieval."""
+        """Test successful challenge retrieval from v2 API."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"challenge": "test-challenge-123"}
+        mock_response.json.return_value = {
+            "challenge": "test-challenge-123",
+            "timestamp": "2025-01-01T12:00:00Z",
+        }
         mock_post.return_value = mock_response
 
         materials = CertificateMaterial(
@@ -130,8 +133,9 @@ class TestKsefAuthClient:
             materials=materials, nip=TEST_NIP, environment="demo"
         )
 
-        challenge = client._get_challenge()
+        challenge, timestamp = client._get_challenge()
         assert challenge == "test-challenge-123"
+        assert timestamp == "2025-01-01T12:00:00Z"
         mock_post.assert_called_once()
 
     @patch("ksef_api_client.auth.requests.post")
@@ -158,7 +162,7 @@ class TestKsefAuthClient:
         """Test challenge retrieval when challenge is missing in response."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {}
+        mock_response.json.return_value = {"timestamp": "2025-01-01T12:00:00Z"}
         mock_post.return_value = mock_response
 
         materials = CertificateMaterial(
@@ -191,7 +195,7 @@ class TestKsefAuthClient:
             client.authenticate()
 
     def test_sign_challenge_with_invalid_key(self):
-        """Test signing challenge with invalid private key."""
+        """Test XAdES document creation with invalid private key."""
         materials = CertificateMaterial(
             cert_data=TEST_CERT_PEM,
             key_data=b"invalid-key-data",
@@ -200,12 +204,11 @@ class TestKsefAuthClient:
             materials=materials, nip=TEST_NIP, environment="demo"
         )
 
-        with pytest.raises(KsefAuthError, match="Signing failed"):
-            client._sign_challenge("test-challenge")
+        with pytest.raises(KsefAuthError, match="XAdES document creation failed"):
+            client._create_xades_document("test-challenge")
 
     def test_sign_challenge_with_wrong_password(self):
-        """Test signing challenge with wrong password for encrypted key."""
-        # This test uses a real encrypted key scenario
+        """Test XAdES document creation with wrong password for encrypted key."""
         materials = CertificateMaterial(
             cert_data=TEST_CERT_PEM,
             key_data=TEST_KEY_PEM,
@@ -215,27 +218,48 @@ class TestKsefAuthClient:
             materials=materials, nip=TEST_NIP, environment="demo"
         )
 
-        # This will likely fail during key loading
+        # This will fail during key loading
         with pytest.raises(KsefAuthError):
-            client._sign_challenge("test-challenge")
+            client._create_xades_document("test-challenge")
 
     @patch("ksef_api_client.auth.requests.post")
     def test_authenticate_success(self, mock_post):
-        """Test full successful authentication flow."""
+        """Test full successful authentication flow with v2 API."""
         # Mock challenge response
         challenge_response = Mock()
         challenge_response.status_code = 200
-        challenge_response.json.return_value = {"challenge": "test-challenge-123"}
-
-        # Mock token response
-        token_response = Mock()
-        token_response.status_code = 201
-        token_response.json.return_value = {
-            "sessionToken": {"token": "test-token-abc"},
+        challenge_response.json.return_value = {
+            "challenge": "test-challenge-123",
             "timestamp": "2025-01-01T12:00:00Z",
         }
 
-        mock_post.side_effect = [challenge_response, token_response]
+        # Mock XAdES authentication response
+        xades_response = Mock()
+        xades_response.status_code = 200
+        xades_response.json.return_value = {
+            "authenticationToken": {"token": "auth-token-abc"},
+            "referenceNumber": "20250101-AU-12345",
+        }
+
+        # Mock token redemption response
+        redeem_response = Mock()
+        redeem_response.status_code = 200
+        redeem_response.json.return_value = {
+            "accessToken": {
+                "token": "access-token-xyz",
+                "validUntil": "2025-01-01T13:00:00Z",
+            },
+            "refreshToken": {
+                "token": "refresh-token-123",
+                "validUntil": "2025-01-08T12:00:00Z",
+            },
+        }
+
+        mock_post.side_effect = [
+            challenge_response,
+            xades_response,
+            redeem_response,
+        ]
 
         materials = CertificateMaterial(
             cert_data=TEST_CERT_PEM,
@@ -247,9 +271,9 @@ class TestKsefAuthClient:
 
         token = client.authenticate()
         assert isinstance(token, AuthToken)
-        assert token.token == "test-token-abc"
+        assert token.token == "access-token-xyz"
         assert isinstance(token.valid_to, datetime)
-        assert mock_post.call_count == 2
+        assert mock_post.call_count == 3
 
     @patch("ksef_api_client.auth.requests.post")
     def test_authenticate_challenge_failure(self, mock_post):
@@ -272,7 +296,7 @@ class TestKsefAuthClient:
 
     @patch("ksef_api_client.auth.requests.post")
     def test_init_token_http_error(self, mock_post):
-        """Test token initialization with HTTP error."""
+        """Test token redemption with HTTP error."""
         mock_response = Mock()
         mock_response.status_code = 401
         mock_response.text = "Unauthorized"
@@ -286,15 +310,20 @@ class TestKsefAuthClient:
             materials=materials, nip=TEST_NIP, environment="demo"
         )
 
-        with pytest.raises(KsefAuthError, match="Failed to init token"):
-            client._init_token("challenge", "signature")
+        with pytest.raises(KsefAuthError, match="Failed to redeem token"):
+            client._redeem_token("test-auth-token")
 
     @patch("ksef_api_client.auth.requests.post")
     def test_init_token_missing_token_in_response(self, mock_post):
-        """Test token initialization when token is missing in response."""
+        """Test token redemption when token is missing in response."""
         mock_response = Mock()
-        mock_response.status_code = 201
-        mock_response.json.return_value = {"timestamp": "2025-01-01T12:00:00Z"}
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "refreshToken": {
+                "token": "refresh-token-123",
+                "validUntil": "2025-01-08T12:00:00Z",
+            }
+        }
         mock_post.return_value = mock_response
 
         materials = CertificateMaterial(
@@ -305,8 +334,8 @@ class TestKsefAuthClient:
             materials=materials, nip=TEST_NIP, environment="demo"
         )
 
-        with pytest.raises(KsefAuthError, match="Session token not found"):
-            client._init_token("challenge", "signature")
+        with pytest.raises(KsefAuthError, match="Access token not found"):
+            client._redeem_token("test-auth-token")
 
 
 class TestCertificateMaterial:

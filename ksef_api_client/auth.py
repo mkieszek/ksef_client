@@ -1,7 +1,7 @@
 """Authentication layer for KSeF.
 
 Provides interfaces for loading certificates/keys and generating authorization tokens
-based on KSeF challenge-response specification.
+based on KSeF challenge-response specification using API v2.
 
 Public API is intentionally minimal at this stage.
 """
@@ -13,6 +13,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from xml.etree import ElementTree as ET
 
 import requests
 from cryptography import x509
@@ -21,9 +22,9 @@ from cryptography.hazmat.primitives.asymmetric import padding
 
 _logger = logging.getLogger(__name__)
 
-# KSeF API endpoints
-KSEF_DEMO_BASE_URL = "https://ksef-demo.mf.gov.pl/api/online"
-KSEF_PROD_BASE_URL = "https://ksef.mf.gov.pl/api/online"
+# KSeF API v2 endpoints (based on OpenAPI spec)
+KSEF_DEMO_BASE_URL = "https://ksef-demo.mf.gov.pl/api/v2"
+KSEF_PROD_BASE_URL = "https://ksef.mf.gov.pl/api/v2"
 
 
 class KsefAuthError(Exception):
@@ -99,7 +100,7 @@ class KsefAuthClient:
         )
 
     def authenticate(self) -> AuthToken:
-        """Perform full authentication flow with KSeF.
+        """Perform full authentication flow with KSeF API v2.
 
         Returns:
             AuthToken containing session token and expiration time.
@@ -109,16 +110,22 @@ class KsefAuthClient:
         """
         try:
             # Step 1: Get authorization challenge
-            challenge = self._get_challenge()
+            challenge, timestamp = self._get_challenge()
             _logger.info("Received authorization challenge from KSeF")
 
-            # Step 2: Sign challenge with private key
-            signature = self._sign_challenge(challenge)
-            _logger.info("Challenge signed successfully")
+            # Step 2: Create XAdES-signed XML document
+            signed_xml = self._create_xades_document(challenge)
+            _logger.info("Created XAdES-signed authentication document")
 
-            # Step 3: Exchange signed challenge for session token
-            token = self._init_token(challenge, signature)
-            _logger.info("Session token obtained successfully")
+            # Step 3: Submit XAdES signature for authentication
+            auth_token, ref_number = self._submit_xades_auth(signed_xml)
+            _logger.info(
+                "Authentication initiated successfully, reference: %s", ref_number
+            )
+
+            # Step 4: Redeem authentication token for access token
+            token = self._redeem_token(auth_token)
+            _logger.info("Access token obtained successfully")
 
             return token
 
@@ -129,23 +136,20 @@ class KsefAuthClient:
             _logger.error("Unexpected error during authentication: %s", e)
             raise KsefAuthError(f"Authentication failed: {e}") from e
 
-    def _get_challenge(self) -> str:
-        """Request authorization challenge from KSeF.
+    def _get_challenge(self) -> tuple[str, str]:
+        """Request authorization challenge from KSeF API v2.
 
         Returns:
-            Challenge string from KSeF API.
+            Tuple of (challenge string, timestamp) from KSeF API.
 
         Raises:
             KsefAuthError: If challenge request fails.
         """
-        url = f"{self._base_url}/Session/AuthorisationChallenge"
+        url = f"{self._base_url}/auth/challenge"
         headers = {"Content-Type": "application/json"}
-        payload = {"contextIdentifier": {"type": "onip", "identifier": self._nip}}
 
         _logger.debug("Requesting challenge from: %s", url)
-        response = requests.post(
-            url, json=payload, headers=headers, timeout=self._timeout
-        )
+        response = requests.post(url, headers=headers, timeout=self._timeout)
 
         if response.status_code != 200:
             _logger.error(
@@ -159,24 +163,31 @@ class KsefAuthClient:
 
         data = response.json()
         challenge = data.get("challenge")
+        timestamp = data.get("timestamp")
+
         if not challenge:
             raise KsefAuthError("Challenge not found in response")
+        if not timestamp:
+            raise KsefAuthError("Timestamp not found in response")
 
-        return challenge
+        return challenge, timestamp
 
-    def _sign_challenge(self, challenge: str) -> str:
-        """Sign challenge with private key.
+    def _create_xades_document(self, challenge: str) -> str:
+        """Create XAdES-signed XML authentication document.
 
         Parameters:
             challenge: Challenge string from KSeF.
 
         Returns:
-            Base64-encoded signature.
+            XAdES-signed XML document as string.
 
         Raises:
-            KsefAuthError: If signing fails.
+            KsefAuthError: If document creation or signing fails.
         """
         try:
+            # Load certificate
+            cert = x509.load_pem_x509_certificate(self._materials.cert_data)
+
             # Load private key
             passphrase_bytes = (
                 self._materials.passphrase.encode()
@@ -187,87 +198,187 @@ class KsefAuthClient:
                 self._materials.key_data, password=passphrase_bytes
             )
 
-            # SHA256 hash of challenge
-            challenge_hash = hashlib.sha256(challenge.encode()).digest()
+            # Create XML namespaces
+            ns_auth = "http://ksef.mf.gov.pl/auth/token/2.0"
+            ns_ds = "http://www.w3.org/2000/09/xmldsig#"
 
-            # Sign using RSA with PKCS1v15 padding and SHA256
-            signature = private_key.sign(
-                challenge_hash, padding.PKCS1v15(), hashes.SHA256()
+            # Register namespaces
+            ET.register_namespace("", ns_auth)
+            ET.register_namespace("ds", ns_ds)
+
+            # Create AuthTokenRequest element
+            root = ET.Element(f"{{{ns_auth}}}AuthTokenRequest")
+
+            # Add Challenge element
+            challenge_elem = ET.SubElement(root, f"{{{ns_auth}}}Challenge")
+            challenge_elem.text = challenge
+
+            # Add ContextIdentifier with NIP
+            context_elem = ET.SubElement(root, f"{{{ns_auth}}}ContextIdentifier")
+            nip_elem = ET.SubElement(context_elem, f"{{{ns_auth}}}Nip")
+            nip_elem.text = self._nip
+
+            # Add SubjectIdentifierType
+            subject_type_elem = ET.SubElement(
+                root, f"{{{ns_auth}}}SubjectIdentifierType"
             )
+            subject_type_elem.text = "certificateSubject"
 
-            # Encode to base64
+            # Convert to string for signing
+            xml_str = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+            # Sign the XML (simplified XAdES - using detached signature)
+            # For production, a full XAdES library should be used
+            canonical_xml = xml_str.decode("utf-8")
+
+            # Calculate digest
+            digest = hashlib.sha256(canonical_xml.encode()).digest()
+            digest_b64 = base64.b64encode(digest).decode()
+
+            # Sign the digest
+            signature = private_key.sign(digest, padding.PKCS1v15(), hashes.SHA256())
             signature_b64 = base64.b64encode(signature).decode()
-            _logger.debug("Challenge signed, signature length: %s", len(signature_b64))
 
-            return signature_b64
+            # Add signature to XML
+            sig_elem = ET.SubElement(root, f"{{{ns_ds}}}Signature")
+            sig_elem.set("Id", "Signature-1")
+
+            signed_info = ET.SubElement(sig_elem, f"{{{ns_ds}}}SignedInfo")
+
+            # CanonicalizationMethod
+            canon_method = ET.SubElement(
+                signed_info, f"{{{ns_ds}}}CanonicalizationMethod"
+            )
+            canon_method.set("Algorithm", "http://www.w3.org/TR/2001/REC-xml-c14n-20010315")
+
+            # SignatureMethod
+            sig_method = ET.SubElement(signed_info, f"{{{ns_ds}}}SignatureMethod")
+            sig_method.set("Algorithm", "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256")
+
+            # Reference
+            reference = ET.SubElement(signed_info, f"{{{ns_ds}}}Reference")
+            reference.set("URI", "")
+
+            # DigestMethod
+            digest_method = ET.SubElement(reference, f"{{{ns_ds}}}DigestMethod")
+            digest_method.set("Algorithm", "http://www.w3.org/2001/04/xmlenc#sha256")
+
+            # DigestValue
+            digest_value = ET.SubElement(reference, f"{{{ns_ds}}}DigestValue")
+            digest_value.text = digest_b64
+
+            # SignatureValue
+            sig_value = ET.SubElement(sig_elem, f"{{{ns_ds}}}SignatureValue")
+            sig_value.text = signature_b64
+
+            # KeyInfo
+            key_info = ET.SubElement(sig_elem, f"{{{ns_ds}}}KeyInfo")
+            x509_data = ET.SubElement(key_info, f"{{{ns_ds}}}X509Data")
+
+            # X509Certificate
+            x509_cert_elem = ET.SubElement(x509_data, f"{{{ns_ds}}}X509Certificate")
+            cert_b64 = base64.b64encode(cert.public_bytes(serialization.Encoding.DER)).decode()
+            x509_cert_elem.text = cert_b64
+
+            # X509SerialNumber
+            x509_serial = ET.SubElement(x509_data, f"{{{ns_ds}}}X509SerialNumber")
+            x509_serial.text = str(cert.serial_number)
+
+            # Convert final XML to string
+            final_xml = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+            _logger.debug("XAdES document created, size: %d bytes", len(final_xml))
+            return final_xml.decode("utf-8")
 
         except Exception as e:
-            _logger.error("Failed to sign challenge: %s", e)
-            raise KsefAuthError(f"Signing failed: {e}") from e
+            _logger.error("Failed to create XAdES document: %s", e)
+            raise KsefAuthError(f"XAdES document creation failed: {e}") from e
 
-    def _init_token(self, challenge: str, signature: str) -> AuthToken:
-        """Exchange signed challenge for session token.
+    def _submit_xades_auth(self, signed_xml: str) -> tuple[str, str]:
+        """Submit XAdES-signed document for authentication.
 
         Parameters:
-            challenge: Original challenge from KSeF.
-            signature: Base64-encoded signature of the challenge.
+            signed_xml: XAdES-signed XML document.
 
         Returns:
-            AuthToken with session token and expiration.
+            Tuple of (authentication_token, reference_number).
 
         Raises:
-            KsefAuthError: If token initialization fails.
+            KsefAuthError: If authentication submission fails.
         """
-        url = f"{self._base_url}/Session/InitToken"
-        headers = {"Content-Type": "application/json"}
+        url = f"{self._base_url}/auth/xades-signature"
+        headers = {"Content-Type": "application/xml"}
 
-        # Load certificate to extract serial number
-        cert = x509.load_pem_x509_certificate(self._materials.cert_data)
-        cert_serial = format(cert.serial_number, "x").upper()
-
-        payload = {
-            "contextIdentifier": {"type": "onip", "identifier": self._nip},
-            "contextName": {
-                "type": "SubjectSerialNumber",
-                "identifier": cert_serial,
-                "credentialsIdentifier": {"type": "onip", "identifier": self._nip},
-            },
-            "authorisationChallenge": {
-                "challenge": challenge,
-                "signatureValue": {
-                    "type": "plain",
-                    "value": signature,
-                    "algorithm": "RSA",
-                },
-            },
-        }
-
-        _logger.debug("Requesting session token from: %s", url)
+        _logger.debug("Submitting XAdES authentication to: %s", url)
         response = requests.post(
-            url, json=payload, headers=headers, timeout=self._timeout
+            url, data=signed_xml.encode("utf-8"), headers=headers, timeout=self._timeout
         )
 
-        if response.status_code != 201:
+        if response.status_code != 200:
             _logger.error(
-                "Token init failed with status %s: %s",
+                "XAdES authentication failed with status %s: %s",
                 response.status_code,
                 response.text,
             )
-            raise KsefAuthError(f"Failed to init token: HTTP {response.status_code}")
+            raise KsefAuthError(
+                f"Failed to authenticate with XAdES: HTTP {response.status_code}"
+            )
 
         data = response.json()
-        session_token = data.get("sessionToken", {}).get("token")
-        timestamp = data.get("timestamp")
+        auth_token = data.get("authenticationToken", {}).get("token")
+        ref_number = data.get("referenceNumber")
 
-        if not session_token:
-            raise KsefAuthError("Session token not found in response")
+        if not auth_token:
+            raise KsefAuthError("Authentication token not found in response")
+        if not ref_number:
+            raise KsefAuthError("Reference number not found in response")
 
-        # Parse timestamp to datetime (KSeF returns ISO format)
+        return auth_token, ref_number
+
+    def _redeem_token(self, auth_token: str) -> AuthToken:
+        """Redeem authentication token for access token.
+
+        Parameters:
+            auth_token: Authentication token from XAdES authentication.
+
+        Returns:
+            AuthToken with access token and expiration.
+
+        Raises:
+            KsefAuthError: If token redemption fails.
+        """
+        url = f"{self._base_url}/auth/token/redeem"
+        headers = {
+            "Content-Type": "application/json",
+            "AuthenticationToken": auth_token,
+        }
+
+        _logger.debug("Redeeming authentication token at: %s", url)
+        response = requests.post(url, headers=headers, timeout=self._timeout)
+
+        if response.status_code != 200:
+            _logger.error(
+                "Token redemption failed with status %s: %s",
+                response.status_code,
+                response.text,
+            )
+            raise KsefAuthError(
+                f"Failed to redeem token: HTTP {response.status_code}"
+            )
+
+        data = response.json()
+        access_token = data.get("accessToken", {}).get("token")
+        valid_until = data.get("accessToken", {}).get("validUntil")
+
+        if not access_token:
+            raise KsefAuthError("Access token not found in response")
+
+        # Parse expiration timestamp
         try:
-            valid_to = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            valid_to = datetime.fromisoformat(valid_until.replace("Z", "+00:00"))
         except Exception as e:
             _logger.warning("Failed to parse token expiration: %s", e)
             # Default to current time if parsing fails
             valid_to = datetime.now()
 
-        return AuthToken(token=session_token, valid_to=valid_to)
+        return AuthToken(token=access_token, valid_to=valid_to)

@@ -109,7 +109,7 @@ class ResCompany(models.Model):
                         "KSeF client dependencies are not available in this environment: %s"
                     )
                     % str(e)
-                )
+                ) from e
 
             # Decode binary fields
             cert_data = base64.b64decode(self.ksef_auth_cert)
