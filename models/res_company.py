@@ -6,7 +6,8 @@ import logging
 from odoo import _, fields, models
 from odoo.exceptions import UserError
 
-from ksef_api_client.auth import CertificateMaterial, KsefAuthClient, KsefAuthError
+# Import ksef client modules lazily inside methods to avoid import-time errors
+# that would prevent Odoo from loading the module (missing deps in environment).
 
 _logger = logging.getLogger(__name__)
 
@@ -88,7 +89,28 @@ class ResCompany(models.Model):
         if nip.startswith("PL"):
             nip = nip[2:]
 
+        # Provide a fallback name for static analysis; real class is imported lazily below.
+        KsefAuthError = Exception
+
         try:
+            # Import KSeF client lazily — this avoids import-time failures when
+            # running Odoo in environments where ksef_api_client deps aren't
+            # available (for example during initial module loading in CI).
+            try:
+                from ksef_api_client.auth import (
+                    CertificateMaterial,
+                    KsefAuthClient,
+                    KsefAuthError,
+                )
+            except Exception as e:
+                _logger.exception("KSeF client import failed: %s", e)
+                raise UserError(
+                    _(
+                        "KSeF client dependencies are not available in this environment: %s"
+                    )
+                    % str(e)
+                )
+
             # Decode binary fields
             cert_data = base64.b64decode(self.ksef_auth_cert)
             key_data = base64.b64decode(self.ksef_auth_key)
