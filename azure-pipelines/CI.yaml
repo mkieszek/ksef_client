@@ -18,8 +18,6 @@ jobs:
     steps:
       - checkout: self
         clean: true
-      - task: DockerInstaller@0
-        displayName: 'Install Docker'
       - script: |
           docker-compose -f compose/docker-compose.base.yml -f compose/docker-compose.test.yml up --abort-on-container-exit --build
         displayName: 'Compose up test overlay'
@@ -38,8 +36,6 @@ jobs:
     steps:
       - checkout: self
         clean: true
-      - task: DockerInstaller@0
-        displayName: 'Install Docker'
       - script: |
           docker build --target=prod -t ksef_client:prod -f docker/odoo/Dockerfile .
         displayName: 'Build prod image'
