@@ -21,14 +21,14 @@ jobs:
       - task: DockerInstaller@0
         displayName: 'Install Docker'
       - script: |
-          docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.test.yml up --abort-on-container-exit --build
+          docker-compose -f compose/docker-compose.base.yml -f compose/docker-compose.test.yml up --abort-on-container-exit --build
         displayName: 'Compose up test overlay'
       - script: |
-          docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.test.yml logs --no-color || true
+          docker-compose -f compose/docker-compose.base.yml -f compose/docker-compose.test.yml logs --no-color || true
         displayName: 'Print Odoo logs on failure'
         condition: failed()
       - script: |
-          docker compose -f compose/docker-compose.base.yml -f compose/docker-compose.test.yml down -v || true
+          docker-compose -f compose/docker-compose.base.yml -f compose/docker-compose.test.yml down -v || true
         displayName: 'Tear down'
         condition: always()
 
