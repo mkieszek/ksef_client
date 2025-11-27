@@ -3,9 +3,9 @@ trigger:
     include:
       - main
       - copilot/**
-  pr:
-    branches:
-      - main
+pr:
+  branches:
+    - main
 
 pool:
   name: 'proxmox-linux'
